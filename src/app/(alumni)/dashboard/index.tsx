@@ -9,6 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { mockLowongan } from "@/services/mock/lowongan";
 import { ijazahValidationService } from "@/services/mock/ijazahValidation";
+import * as DocumentPicker from "expo-document-picker";
+import { USE_MOCK } from "@/services/api";
 
 export default function AlumniDashboardScreen() {
   const router = useRouter();
@@ -34,6 +36,9 @@ export default function AlumniDashboardScreen() {
     const unsubscribe = ijazahValidationService.subscribe(() => {
       setReqs([...ijazahValidationService.getRequirements()]);
     });
+    if (!USE_MOCK) {
+      ijazahValidationService.loadRequirements().catch((err) => console.error(err));
+    }
     return unsubscribe;
   }, []);
 
@@ -93,43 +98,75 @@ export default function AlumniDashboardScreen() {
 
   const helpLink = getHelpLink(activeReq.id);
 
-  const handleUpload = (id: number) => {
-    if (id === 5) {
-      setStep5Uploading(true);
-      setTimeout(() => {
-        setStep5DraftFile("pengembalian_toga_1902001.pdf");
-        setStep5Uploading(false);
-      }, 1200);
-      return;
-    }
+  const handleUpload = async (id: number) => {
+    try {
+      const pickerResult = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
 
-    ijazahValidationService.updateRequirementStatus(id, "uploading");
+      if (pickerResult.canceled) return;
+      const asset = pickerResult.assets[0];
 
-    setTimeout(() => {
-      const fakeFiles: Record<number, string> = {
-        2: "bebas_pustaka_1902001.pdf",
-        3: "bukti_keuangan_1902001.pdf",
-        4: "tanda_terima_skripsi_1902001.pdf",
-      };
-      ijazahValidationService.updateRequirementStatus(
-        id, 
-        "pending_verification", 
-        fakeFiles[id] || "dokumen_bukti.pdf"
+      if (id === 5) {
+        setStep5Uploading(true);
+        try {
+          await ijazahValidationService.uploadRequirementFile(
+            5,
+            asset.uri,
+            asset.name,
+            asset.mimeType || "application/pdf"
+          );
+          setStep5DraftFile(asset.name);
+        } catch (error) {
+          Alert.alert("Gagal", "Gagal mengunggah berkas toga.");
+        } finally {
+          setStep5Uploading(false);
+        }
+        return;
+      }
+
+      await ijazahValidationService.uploadRequirementFile(
+        id,
+        asset.uri,
+        asset.name,
+        asset.mimeType || "application/pdf"
       );
-    }, 1200);
+
+      if (Platform.OS === 'web') {
+        alert(`Berkas ${asset.name} berhasil diunggah!`);
+      } else {
+        Alert.alert("Sukses", `Berkas ${asset.name} berhasil diunggah!`);
+      }
+    } catch (error) {
+      console.error("Document picker or upload error:", error);
+      Alert.alert("Error", "Terjadi kesalahan saat memilih atau mengunggah berkas.");
+    }
   };
 
-  const handleStep5Submit = () => {
+  const handleStep5Submit = async () => {
     if (!step5DraftFile) return;
 
     const confirmMessage = "Apakah Anda yakin ingin mengirim berkas bukti pengembalian toga berikut?\n\nFile: " + step5DraftFile;
 
+    const executeSubmit = async () => {
+      try {
+        await ijazahValidationService.submitRequirement5();
+        setStep5DraftFile(null);
+        if (Platform.OS === 'web') {
+          alert("Berkas bukti pengembalian toga berhasil dikirim ke BAAK!");
+        } else {
+          Alert.alert("Sukses", "Berkas bukti pengembalian toga berhasil dikirim ke BAAK!");
+        }
+      } catch (error) {
+        Alert.alert("Gagal", "Gagal mengirimkan pengajuan berkas toga.");
+      }
+    };
+
     if (Platform.OS === 'web') {
       const confirmSubmit = window.confirm(confirmMessage);
       if (confirmSubmit) {
-        ijazahValidationService.updateRequirementStatus(5, "pending_verification", step5DraftFile);
-        setStep5DraftFile(null);
-        alert("Berkas bukti pengembalian toga berhasil dikirim ke BAAK!");
+        await executeSubmit();
       }
     } else {
       Alert.alert(
@@ -140,9 +177,7 @@ export default function AlumniDashboardScreen() {
           { 
             text: "Ya, Kirim", 
             onPress: () => {
-              ijazahValidationService.updateRequirementStatus(5, "pending_verification", step5DraftFile);
-              setStep5DraftFile(null);
-              Alert.alert("Sukses", "Berkas bukti pengembalian toga berhasil dikirim ke BAAK!");
+              executeSubmit().catch((err) => console.error(err));
             }
           }
         ]

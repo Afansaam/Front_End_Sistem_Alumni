@@ -1,14 +1,17 @@
-import React, { useState } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { JobCard } from "@/components/cards/JobCard";
 import { mockLowongan } from "@/services/mock/lowongan";
 import { Brand } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
+import { api, USE_MOCK } from "@/services/api";
 
 export default function LowonganListScreen() {
   const [selectedFakultas, setSelectedFakultas] = useState<string>("Semua");
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const categories = [
     { label: "Semua Bidang", value: "Semua" },
@@ -17,10 +20,36 @@ export default function LowonganListScreen() {
     { label: "Sains & Teknologi", value: "Fakultas Sains & Teknologi" },
   ];
 
-  const filteredJobs = mockLowongan.filter((job) => {
-    if (selectedFakultas === "Semua") return true;
-    return job.fakultas === selectedFakultas;
-  });
+  useEffect(() => {
+    if (USE_MOCK) {
+      const localFiltered = mockLowongan.filter((job) => {
+        if (selectedFakultas === "Semua") return true;
+        return job.fakultas === selectedFakultas;
+      });
+      setJobs(localFiltered);
+      return;
+    }
+
+    const fetchJobs = async () => {
+      setLoading(true);
+      try {
+        const url = selectedFakultas === "Semua" 
+          ? "/lowongan" 
+          : `/lowongan?fakultas=${encodeURIComponent(selectedFakultas)}`;
+        const response = await api.get(url);
+        const jobsData = Array.isArray(response.data) ? response.data : response.data.data || [];
+        setJobs(jobsData);
+      } catch (error) {
+        console.error("Failed to fetch jobs from Laravel:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobs().catch(err => console.error(err));
+  }, [selectedFakultas]);
+
+  const filteredJobs = jobs;
 
   return (
     <View className="flex-1 bg-white">
@@ -61,7 +90,12 @@ export default function LowonganListScreen() {
             </View>
 
             <View className="flex-row flex-wrap justify-center gap-5">
-              {filteredJobs.length > 0 ? (
+              {loading ? (
+                <View className="py-16 items-center justify-center w-full">
+                  <ActivityIndicator size="large" color={Brand.navy} />
+                  <Text className="text-gray-500 font-semibold text-sm mt-3">Memuat lowongan...</Text>
+                </View>
+              ) : filteredJobs.length > 0 ? (
                 filteredJobs.map((job) => (
                   <JobCard key={job.id} job={job} />
                 ))

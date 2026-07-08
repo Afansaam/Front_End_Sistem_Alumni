@@ -4,6 +4,7 @@ import { Brand } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { ijazahValidationService, RequirementItem } from "@/services/mock/ijazahValidation";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { USE_MOCK } from "@/services/api";
 import { useAuth } from "@/context/AuthContext";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -21,22 +22,33 @@ export default function AdminTracerStudyScreen() {
     const unsubscribe = ijazahValidationService.subscribe(() => {
       setReqs([...ijazahValidationService.getRequirements()]);
     });
+    if (!USE_MOCK) {
+      ijazahValidationService.loadRequirements().catch((err) => console.error(err));
+    }
     return unsubscribe;
   }, []);
 
-  const handleApprove = (id: number) => {
+  const handleApprove = async (id: number) => {
     if (!hasAuthority) return;
-    ijazahValidationService.updateRequirementStatus(id, "verified");
-    if (Platform.OS !== "web") {
-      Alert.alert("Sukses", "Dokumen berhasil disetujui.");
+    try {
+      await ijazahValidationService.approveRequirement(id);
+      if (Platform.OS !== "web") {
+        Alert.alert("Sukses", "Dokumen berhasil disetujui.");
+      }
+    } catch (error) {
+      Alert.alert("Gagal", "Gagal menyetujui dokumen.");
     }
   };
 
-  const handleReject = (id: number) => {
+  const handleReject = async (id: number) => {
     if (!hasAuthority) return;
-    ijazahValidationService.updateRequirementStatus(id, "rejected");
-    if (Platform.OS !== "web") {
-      Alert.alert("Ditolak", "Dokumen telah ditolak.");
+    try {
+      await ijazahValidationService.rejectRequirement(id);
+      if (Platform.OS !== "web") {
+        Alert.alert("Ditolak", "Dokumen telah ditolak.");
+      }
+    } catch (error) {
+      Alert.alert("Gagal", "Gagal menolak dokumen.");
     }
   };
 

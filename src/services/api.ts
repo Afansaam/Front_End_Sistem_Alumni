@@ -13,13 +13,14 @@ import { getToken, removeToken, removeUser } from "@/utils/storage";
 const API_BASE_URL =
   Constants.expoConfig?.extra?.API_BASE_URL || "http://192.168.1.5:8000/api";
 
-export const USE_MOCK = true; // Ubah ke false untuk menghubungkan ke API Laravel asli
+export const USE_MOCK = false; // Ubah ke false untuk menghubungkan ke API Laravel asli
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",
+    "Accept": "application/json",
   },
 });
 
