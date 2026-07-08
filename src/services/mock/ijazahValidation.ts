@@ -198,7 +198,36 @@ export const ijazahValidationService = {
       throw error;
     }
   },
-  
+
+  loadAdminVerifications: async () => {
+    if (USE_MOCK) {
+      // Return mapped mock student requirements as verification objects
+      return mockStudentReqs.map((r) => ({
+        id: r.id,
+        requirement_id: r.id,
+        status: r.status,
+        file_name: r.fileName,
+        user: {
+          alumni_profile: {
+            nama: "Alumni Demo",
+            nim: "1902001",
+            fakultas: "Fakultas Sains & Teknologi",
+            prodi: "Informatika"
+          }
+        }
+      }));
+    }
+
+    try {
+      const response = await api.get("/admin/verifications");
+      // Map Laravel verification response structure
+      return response.data;
+    } catch (error) {
+      console.error("Failed to load admin verifications from Laravel API:", error);
+      throw error;
+    }
+  },
+
   resetRequirements: () => {
     mockStudentReqs = mockStudentReqs.map((r) => {
       if (r.id === 1) return { ...r, status: "verified", fileName: "Database Tracer Study UNUHA" };
