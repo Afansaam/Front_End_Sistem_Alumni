@@ -23,7 +23,7 @@ import {
   getUser as loadStoredUser,
   removeUser,
 } from "@/utils/storage";
-import { api } from "@/services/api";
+import { api, USE_MOCK } from "@/services/api";
 import type {
   User,
   UserRole,
@@ -85,6 +85,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (payload: LoginPayload): Promise<{ success: boolean; message: string }> => {
       try {
+        if (!USE_MOCK) {
+          const response = await api.post<AuthResponse>("/login", payload);
+          const authData = response.data.data;
+          
+          if (!authData || !authData.token || !authData.user) {
+            return { success: false, message: response.data.message || "Email atau password salah" };
+          }
+
+          const { token, user } = authData;
+
+          await setToken(token);
+          await storeUser(user);
+
+          setState({
+            user,
+            token,
+            role: user.role,
+            isLoading: false,
+            isAuthenticated: true,
+          });
+
+          redirectByRole(user.role);
+          return { success: true, message: "Login berhasil" };
+        }
+
         // --- MOCK IMPLEMENTATION ---
         await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
         
@@ -138,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return { success: true, message: "Login berhasil (Mock)" };
       } catch (error: any) {
-        return { success: false, message: "Terjadi kesalahan saat login" };
+        return { success: false, message: error.response?.data?.message || "Terjadi kesalahan saat login" };
       }
     },
     [router]
@@ -148,6 +173,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(
     async (payload: RegisterPayload): Promise<{ success: boolean; message: string }> => {
       try {
+        if (!USE_MOCK) {
+          const response = await api.post<AuthResponse>("/register", payload);
+          const authData = response.data.data;
+
+          if (!authData || !authData.token || !authData.user) {
+            return { success: false, message: response.data.message || "Gagal melakukan registrasi" };
+          }
+
+          const { token, user } = authData;
+
+          await setToken(token);
+          await storeUser(user);
+
+          setState({
+            user,
+            token,
+            role: user.role,
+            isLoading: false,
+            isAuthenticated: true,
+          });
+
+          redirectByRole(user.role);
+          return { success: true, message: "Registrasi berhasil" };
+        }
+
         // --- MOCK IMPLEMENTATION ---
         await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
         
@@ -186,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return { success: true, message: "Registrasi berhasil (Mock)" };
       } catch (error: any) {
-        return { success: false, message: "Terjadi kesalahan saat registrasi" };
+        return { success: false, message: error.response?.data?.message || "Terjadi kesalahan saat registrasi" };
       }
     },
     [router]
@@ -230,6 +280,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // === Update Alumni Profile ===
   const updateAlumniProfile = useCallback(
     async (profile: { nama: string; nim: string; prodi?: string; fakultas?: string }) => {
+      if (!USE_MOCK) {
+        const response = await api.put<{ user: User }>("/user/profile", profile);
+        const updatedUser = response.data.user;
+        await storeUser(updatedUser);
+        setState((prev) => ({ ...prev, user: updatedUser }));
+        return;
+      }
+
+      // Mock implementation
       setState((prev) => {
         if (!prev.user) return prev;
         
