@@ -12,8 +12,7 @@ import { Platform } from "react-native";
 import { getToken, removeToken, removeUser } from "@/utils/storage";
 
 const API_BASE_URL =
-  Constants.expoConfig?.extra?.API_BASE_URL ||
-  (Platform.OS === "web" ? "http://127.0.0.1:8000/api" : "http://192.168.1.5:8000/api");
+  Constants.expoConfig?.extra?.API_BASE_URL || "http://192.168.1.5:8000/api";
 
 export const USE_MOCK = false; // Ubah ke false untuk menghubungkan ke API Laravel asli
 
