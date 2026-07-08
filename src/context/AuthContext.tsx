@@ -162,7 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return { success: true, message: "Login berhasil (Mock)" };
       } catch (error: any) {
-        return { success: false, message: error.response?.data?.message || "Terjadi kesalahan saat login" };
+        console.error("Login API Error:", error);
+        return { success: false, message: error.response?.data?.message || error.message || "Terjadi kesalahan saat login" };
       }
     },
     [router]
@@ -234,7 +235,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return { success: true, message: "Registrasi berhasil (Mock)" };
       } catch (error: any) {
-        return { success: false, message: error.response?.data?.message || "Terjadi kesalahan saat registrasi" };
+        console.error("Register API Error:", error);
+        return { success: false, message: error.response?.data?.message || error.message || "Terjadi kesalahan saat registrasi" };
       }
     },
     [router]
