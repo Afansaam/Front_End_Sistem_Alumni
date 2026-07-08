@@ -1,0 +1,168 @@
+# PROJECT CONTEXT — Pusat Karir & Alumni UNUHA (Tracer Study System)
+
+> File ini adalah sumber kebenaran (source of truth) project.
+> AI agent WAJIB membaca ulang file ini sebelum membangun/mengubah fitur apapun,
+> dan tidak boleh mengambil keputusan arsitektur yang bertentangan dengan isi file ini.
+> Jika ada AGENTS.md atau CLAUDE.md lain di project ini, file ini melengkapi (bukan menggantikan)
+> aturan umum di sana — untuk aturan spesifik produk/fitur, ikuti file ini.
+
+## 0. Catatan Stack (PENTING — beda dari rencana awal)
+
+Project ini SUDAH di-scaffold pakai **Expo** (bukan Vite React polos), terbukti dari:
+- Folder `.expo`, file `app.json`, `expo-env.d.ts`
+- Script `"web": "expo start --web"` di `package.json`
+- Routing file-based di `src/app` (Expo Router)
+- TypeScript sudah aktif (`tsconfig.json`)
+
+Konsekuensinya:
+- Gunakan **Expo Router** (file-based routing di `src/app/**`), BUKAN React Router.
+- Komponen UI pakai **React Native components** (`View`, `Text`, `Pressable`/`TouchableOpacity`, `TextInput`, `ScrollView`, `FlatList`, `Image`), BUKAN elemen HTML (`div`, `button`, dst) — walaupun target utama saat ini adalah web (`expo start --web`), kode harus tetap React Native-compatible supaya bisa jalan juga di Android/iOS nanti.
+- Styling pakai **StyleSheet.create()** dari `react-native`, atau **NativeWind** (Tailwind syntax untuk React Native) jika sudah/akan diinstal — pilih salah satu dan konsisten di seluruh project. Jangan pakai className Tailwind biasa tanpa NativeWind karena tidak akan berjalan di React Native.
+- Untuk tabel data yang kompleks (admin panel, banyak kolom) di web, boleh gunakan custom component berbasis `View`+`Text` yang di-layout seperti tabel (grid dengan flexbox), karena React Native tidak punya elemen `<table>` native.
+- Icon: gunakan `@expo/vector-icons` (sudah bundled di Expo), bukan library icon berbasis web seperti lucide-react/font-awesome web.
+- Data fetching: `fetch` atau `axios` tetap bisa dipakai seperti biasa (kompatibel RN & web).
+
+## 1. Latar Belakang
+
+Sistem lama Pusat Karir & Alumni Universitas Nurul Huda (UNUHA) sudah tidak berfungsi
+(domain/hosting mati) sekitar 1 bulan. Sistem baru harus dibangun dari nol.
+
+Fungsi kritis sistem:
+- Alumni **wajib mengisi data tracer study** sebelum bisa mengambil ijazah (syarat kelulusan dari rektorat).
+- Data ini juga dipakai untuk **akreditasi program studi**.
+- Referensi gaya sistem: mirip **Semisol** (data mahasiswa aktif, jumlah alumni, partner perusahaan, lokasi kampus, dll).
+
+## 2. Tech Stack
+
+- **Frontend**: Expo (React Native + React Native Web) + Expo Router + TypeScript
+- **Styling**: NativeWind (disarankan, sintaks mirip Tailwind) atau StyleSheet biasa — konsisten satu pilihan
+- **State management**: React Context (untuk auth) + Zustand kalau butuh state global lain (ringan, hindari over-engineering)
+- **Form & validasi**: `react-hook-form` + `zod` (kompatibel React Native)
+- **HTTP client**: `axios` dengan instance terpusat di `src/services/api.ts`, interceptor untuk JWT
+- **Backend**: Node.js + Express (atau NestJS jika perlu struktur lebih ketat) — REPO TERPISAH dari frontend Expo ini
+- **Database**: PostgreSQL + Prisma ORM
+- **Auth**: JWT (access token + refresh token), simpan token dengan `expo-secure-store` (lebih aman dari AsyncStorage biasa untuk mobile) — untuk target web, fallback ke `localStorage` lewat abstraksi storage yang sama
+- **File storage**: local disk `/uploads` untuk tahap localhost, siap dipindah ke S3-compatible storage saat hosting
+- **Export laporan**: dikerjakan di backend — `exceljs` (Excel) dan `pdfkit`/`puppeteer` (PDF) per program studi
+- **Tahap 1**: jalan di localhost/`expo start --web` dulu untuk direview tim → baru tahap hosting/VPS dikoordinasikan dengan Pak Uli (IT Center)
+
+## 3. Role & Hak Akses (WAJIB dipatuhi ketat, jangan bocor data antar role)
+
+| Role | Siapa | Akses |
+|---|---|---|
+| **Public (guest)** | Siapapun tanpa login | Landing page, statistik agregat (bukan data personal), lokasi kampus, daftar lowongan (redirect ke website perusahaan), berita kampus, profil umum universitas. TIDAK BOLEH lihat data pribadi alumni. Diarahkan ke website PMB jika ingin daftar kuliah. |
+| **Alumni/Mahasiswa** | Pemilik akun pribadi | Login, isi/edit profil & CV, isi tracer study, lihat & lamar lowongan, riwayat lamaran, hanya bisa lihat **data miliknya sendiri**. |
+| **Dosen & Pimpinan Prodi/Fakultas** | Internal kampus | Lihat data alumni agregat & per-prodi (read-only) untuk keperluan akreditasi. Bisa download laporan Excel/PDF per prodi. |
+| **Admin** (Pusat Karir, misal Ibu Ratih) | Tim Pusat Karir | Validasi data tracer study alumni, kelola lowongan kerja, publikasi berita kampus, verifikasi perusahaan partner. |
+| **Super Admin** (IT Center, misal Pak Uli) | IT Center | Semua akses Admin + kelola akun staff/user & privilege level, kelola master akademik (prodi/fakultas, sinkronisasi PDDIKTI/SIAKAD), backup & restore database, log audit, keamanan sistem. |
+
+## 4. Peta Fitur / Use Case (UC)
+
+Gunakan penomoran ini di kode (nama file route/comment) agar traceable:
+
+- **UC-01** Statistik Alumni (agregat publik)
+- **UC-02** Lokasi Kampus
+- **UC-03** Lowongan Kerja (listing publik, redirect ke website perusahaan saat "Lamar")
+- **UC-04** Berita Kampus
+- **UC-05** Profil Alumni (publik, agregat/testimoni — bukan data personal detail)
+- **UC-06** Lengkapi Profil & CV (alumni, login)
+- **UC-07** Isi Tracer Study (alumni, login) — wajib sebelum ambil ijazah
+- **UC-08** Validasi Tracer Study Alumni (admin) — approve/edit/reject data alumni
+- **UC-09** Kelola Lowongan Kerja (admin) — CRUD lowongan dari perusahaan mitra
+- **UC-10** Publikasi Berita Kampus (admin) — CRUD berita
+- **UC-11** Verifikasi Perusahaan Partner (admin & super admin) — approve mitra baru
+- **UC-12** Kelola Akun Pengguna / User Staff (super admin) — CRUD staff, atur privilege level, suspend/aktifkan
+- **UC-13** Kelola Master Akademik Prodi & Fakultas (super admin) — sinkron dengan PDDIKTI/SIAKAD
+- **UC-18** System Database Backup & Restore (super admin)
+
+> UC-14–17 belum ada di wireframe (kemungkinan Laporan Global, Pengaturan Panel, Log Audit, Keamanan Sistem — buat stub/placeholder dulu).
+
+## 5. Struktur Route (Expo Router, file-based di `src/app`)
+
+```
+src/app/
+  index.tsx                    → Landing page (public)     [UC-01..05 ditampilkan di sini via section]
+  statistik.tsx                 → UC-01
+  lokasi-kampus.tsx              → UC-02
+  lowongan/
+    index.tsx                   → UC-03 (list)
+    [id].tsx                    → detail + tombol redirect ke website perusahaan (Linking.openURL)
+  berita.tsx                    → UC-04
+  profil-alumni.tsx              → UC-05
+  masuk.tsx                    → Login
+  daftar.tsx                   → Register (alumni)
+  lupa-password.tsx              → Forgot password flow
+
+  (alumni)/                    → route group, dibungkus layout ProtectedRoute role=alumni
+    dashboard/
+      index.tsx                 → Ringkasan + kelengkapan profil (%)
+      profil-cv.tsx               → UC-06
+      tracer-study.tsx            → UC-07
+      cari-lowongan.tsx            → UC-03 versi login (bisa lamar & tracking)
+      riwayat-lamaran.tsx          → history status lamaran
+      pengaturan.tsx              → ganti password, dst
+
+  (admin)/                     → route group, layout ProtectedRoute role=admin
+    admin/
+      index.tsx                  → Ringkasan Statistik (Manajemen Pusat)
+      tracer-study.tsx             → UC-08
+      lowongan.tsx                 → UC-09
+      berita.tsx                  → UC-10
+      mitra.tsx                   → UC-11
+
+  (superadmin)/                 → route group, layout ProtectedRoute role=super_admin
+    superadmin/
+      index.tsx                  → Dashboard operasional
+      profil-alumni.tsx
+      lowongan.tsx
+      berita.tsx
+      mitra.tsx
+      user-staff.tsx               → UC-12
+      master-akademik.tsx           → UC-13
+      database.tsx                → UC-18
+      laporan-global.tsx
+      pengaturan-panel.tsx
+
+  _layout.tsx                   → root layout: AuthProvider + navigation stack
+```
+
+## 6. Data Model Inti (garis besar — sesuaikan detail saat implementasi Prisma schema di backend)
+
+```
+User            (id, email, password_hash, role[alumni|admin|super_admin|dosen], status, last_login, privilege_level)
+AlumniProfile   (user_id, nim, nama, prodi_id, angkatan, no_hp, alamat, status_kerja[bekerja_fulltime|bekerja_freelance|wiraswasta|belum_bekerja], cv_url, skills[], profil_completion_percent)
+TracerStudy     (id, alumni_id, tahun, jawaban_kuisioner(json), status_verifikasi[pending|terverifikasi|ditolak], verified_by, verified_at)
+Lowongan        (id, judul, perusahaan, lokasi, tipe[fulltime|contract|internship|remote], deskripsi, link_eksternal, mitra_id, status[aktif|nonaktif])
+Lamaran         (id, alumni_id, lowongan_id, tanggal_daftar, status[pending|diterima|ditolak])
+Berita          (id, judul, konten, gambar_url, published_at, author_id)
+PerusahaanMitra (id, nama, status_verifikasi[pending|verified|rejected], dokumen_legalitas)
+ProdiFakultas   (id, nama_prodi, fakultas, kode, sumber_sync[pddikti|manual])
+AuditLog        (id, user_id, aksi, target, timestamp)
+```
+
+## 7. Konvensi Desain (dari wireframe)
+
+- Warna utama: **navy/dark blue** (`#0B2C4D` kira-kira) untuk header/footer/sidebar & tombol primer, **orange/amber** untuk CTA (`Mulai Mengisi Kuesioner`, tombol utama landing page)
+- Layout admin & super admin: **sidebar kiri fixed** (di web) + konten kanan dengan card statistik di atas + tabel data di bawah. Untuk breakpoint mobile/RN, sidebar bisa jadi drawer/bottom nav.
+- Card statistik: icon di kiri, angka besar bold, label kecil di bawah
+- "Tabel" data (dibuat dengan View+Text berbasis flexbox, bukan `<table>`): kolom Aksi berisi ikon verifikasi (✓), edit (pensil), hapus (tempat sampah) dari `@expo/vector-icons`
+- Badge status berwarna: hijau (terverifikasi/diterima/aktif), oranye (pending), merah (ditolak/suspended)
+- Font: sans-serif modern (contoh: Inter — load via `expo-font` atau `@expo-google-fonts/inter`)
+- Semua daftar data besar wajib **pagination** dan **search/filter**
+
+## 8. Non-Functional Requirements
+
+- Data pribadi alumni **tidak boleh diakses publik** — enforce di level API backend (bukan cuma sembunyikan di UI)
+- Export laporan **per program studi** dalam format **Excel** dan **PDF** (proses di backend, frontend hanya trigger download/share)
+- Sistem harus **role-based access control (RBAC)** ketat di backend (middleware), jangan andalkan hide-UI saja
+- Responsive untuk web (`expo start --web`) minimal di landing page & dashboard alumni; tetap kompatibel struktur RN untuk kemungkinan build mobile nanti
+- Development bertahap: **Fase 1 lokal (`expo start --web`) → review tim → Fase 2 hosting/VPS** (dikoordinasi dengan IT Center)
+- Siapkan `.env`/`app.config.ts` `extra` untuk `API_BASE_URL` dll — JANGAN hardcode secret
+
+## 9. Yang HARUS dihindari AI agent
+
+- Jangan pakai elemen HTML murni (`<div>`, `<button>`, className Tailwind tanpa NativeWind) — ini project Expo/React Native, harus konsisten pakai komponen RN
+- Jangan bikin autentikasi custom yang tidak aman (selalu hash password di backend, jangan simpan plain text)
+- Jangan gabungkan logic role di satu komponen besar tanpa pemisahan (pisahkan per route group: `(alumni)`, `(admin)`, `(superadmin)`, public routes)
+- Jangan lupa redirect lowongan ke **website eksternal perusahaan** (`Linking.openURL`), bukan form lamaran internal
+- Jangan expose endpoint backup/restore database ke role selain super_admin
