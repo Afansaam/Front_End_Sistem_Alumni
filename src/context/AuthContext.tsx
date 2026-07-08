@@ -86,14 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (payload: LoginPayload): Promise<{ success: boolean; message: string }> => {
       try {
         if (!USE_MOCK) {
-          const response = await api.post<AuthResponse>("/login", payload);
-          const authData = response.data.data;
+          const response = await api.post<any>("/login", payload);
+          const token = response.data?.token || response.data?.data?.token || response.data?.access_token || response.data?.data?.access_token;
+          const user = response.data?.user || response.data?.data?.user;
           
-          if (!authData || !authData.token || !authData.user) {
-            return { success: false, message: response.data.message || "Email atau password salah" };
+          if (!token || !user) {
+            return { success: false, message: response.data?.message || "Email atau password salah" };
           }
-
-          const { token, user } = authData;
 
           await setToken(token);
           await storeUser(user);
@@ -174,14 +173,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (payload: RegisterPayload): Promise<{ success: boolean; message: string }> => {
       try {
         if (!USE_MOCK) {
-          const response = await api.post<AuthResponse>("/register", payload);
-          const authData = response.data.data;
+          const response = await api.post<any>("/register", payload);
+          const token = response.data?.token || response.data?.data?.token || response.data?.access_token || response.data?.data?.access_token;
+          const user = response.data?.user || response.data?.data?.user;
 
-          if (!authData || !authData.token || !authData.user) {
-            return { success: false, message: response.data.message || "Gagal melakukan registrasi" };
+          if (!token || !user) {
+            return { success: false, message: response.data?.message || "Gagal melakukan registrasi" };
           }
-
-          const { token, user } = authData;
 
           await setToken(token);
           await storeUser(user);
